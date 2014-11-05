@@ -1,3 +1,5 @@
+ #!/usr/bin/perl
+
 use Modern::Perl;
 use Text::CSV;
 use Data::Dumper;
@@ -10,17 +12,24 @@ my $filename = 'records.csv';
 
 my $lines = io $filename;
 
-while ( my $row = $csv->getline( $lines ) ) {
-	my @bits = split(" - ", $row->[1]);
-	if (defined $bits[4]) {
-	my $target = $bits[4];
-    my $response = HTTP::Tiny->new->get('http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search?query=' . $target);
-    say "Looking for $target";
-    say "";
-    say $response->{content};
-    say "";
-    }
+while ( my $row = $csv->getline($lines) ) {
     
- }
- 
- 
+    my $title = $row->[1];
+    my $catalogue_reference = $row->[0];
+    my @title_parts = reverse split( " - ", $title );
+    
+# 	say join ' --- ', @title_parts;
+	my $nice_first = @title_parts[0];
+	$nice_first =~ s/\.$//;
+	say $nice_first;
+
+        
+    ## end if ( defined $bits[4] )
+
+} ## end while ( my $row = $csv->getline...)
+
+ # my $response = HTTP::Tiny->new->get(
+# 'http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search?query='
+#               . $target );
+# say $response->{content};
+#         say "";
