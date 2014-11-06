@@ -25,7 +25,6 @@
                                (element-xy->xy (list-ref values 16))))
                    'properties
                    (hash 
-                    ; Name,Area_code,Descriptio,File_name,Number,Number0,Polygon_id,Unit_id,Code,Hectares,Area,Type_code,Descript0,Type_cod0,Descript1,Longitude,Latitude
                     'name (list-ref values 0)
                     'area-code (list-ref values 1)
                     'description (list-ref values 2)
@@ -52,5 +51,6 @@
                                    #:exists 'update))
 
 (write-json (hash 'type "FeatureCollection" 'features features) out-port)
+
 (display "done")
 
