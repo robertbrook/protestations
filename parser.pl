@@ -6,6 +6,9 @@ use Data::Dumper;
 use IO::All -utf8;
 use LWP::Simple;
 use JSON;
+use XML::LibXML '1.70';
+
+my $parser = XML::LibXML->new();
 
 my $csv = Text::CSV->new();
 
@@ -15,20 +18,23 @@ my $lines = io $filename;
 
 while ( my $row = $csv->getline($lines) ) {
     next if ( $. == 1 );
-    my $title               = $row->[1];
+    my %r;
+    my $title = $row->[1];
+    $r{'catalogue_reference'} = $row->[0];
+    $r{'title'}               = $row->[1];
     my $catalogue_reference = $row->[0];
-    my @title_parts         = reverse split( " - ", $title );
+    my @title_parts = split( " - ", $title );
+    my @title_parts_reversed = reverse @title_parts;
+
+    my $GLatLong;
     
-    my $OSLatLong;
-    my $NOSMLatLong;
+    $r{'shire'} = $title_parts[1];
 
-    # 	say join ' --- ', @title_parts;
-
-    my $nice_first = $title_parts[0];
+    my $nice_first = $title_parts_reversed[0];
     $nice_first =~ s/\.$//;       # trailing period
     $nice_first =~ s/^\s//;       # leading space
     $nice_first =~ s/\[\?\]//;    # leading space
-    say "";
+    $r{'target'} = $nice_first;
 
     my $OSJSON = get(
 'http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search?query='
@@ -39,10 +45,9 @@ while ( my $row = $csv->getline($lines) ) {
         if ( $OSFirstResult->{type} eq
             "http://data.ordnancesurvey.co.uk/ontology/admingeo/CivilParish" )
         {
-            $OSLatLong = [$OSFirstResult->{latitude}, $OSFirstResult->{longitude}] || [];
+            $r{'OS'} = [ $OSFirstResult->{latitude}, $OSFirstResult->{longitude} ];
         }
-    }    
-    
+    }
 
     my $NOSMJSON = get(
 'http://nominatim.openstreetmap.org/search/?email=robertbrook@fastmail.fm&format=json&countrycodes=gb&q='
@@ -50,12 +55,44 @@ while ( my $row = $csv->getline($lines) ) {
     my $NOSMResponse    = decode_json $NOSMJSON;
     my $NOSMFirstResult = shift $NOSMResponse;
     if ($NOSMFirstResult) {
-    $NOSMLatLong = [$NOSMFirstResult->{lat}, $NOSMFirstResult->{lon}] || [];
+        $r{'NOSM'} = [ $NOSMFirstResult->{lat}, $NOSMFirstResult->{lon} ];
     }
-    
-    say Dumper {"Name" => $nice_first, "OS" => $OSLatLong, "NOSM" => $NOSMLatLong};
 
+    #     my $GJSON =
+    #       get(  'http://maps.googleapis.com/maps/api/geocode/json?address='
+    #           . $nice_first
+    #           . '&region=gb' );
+    #     my $GResponse      = decode_json $GJSON;
+    #     my $GFirstResult   = shift $GResponse->{results};
+    #     my $GLatLongResult = $GFirstResult->{geometry}->{location};
+    #     if ($GFirstResult) {
+    #         $GLatLong = [ $GLatLongResult->{lat}, $GLatLongResult->{lng} ];
+    #     }
+
+    my $DEEPJSON =
+      get(  'http://unlock.edina.ac.uk/ws/search?name='
+          . $nice_first
+          . '&searchVariants=false&gazetteer=deep&format=json' );
+    my $DEEPResponse    = decode_json $DEEPJSON;
+    my $DEEPFirstResult = shift $DEEPResponse->{features};
+    my $DEEPProperties  = $DEEPFirstResult->{properties};
+    if ( $DEEPFirstResult->{properties} ) {
+        $r{'DEEP-centroid'} = [ reverse split( /,/, $DEEPProperties->{centroid} ) ];
+        my $LocationsXML = $DEEPProperties->{locations};
+        my $dom =
+          XML::LibXML->load_xml(
+            string => "<locations>$LocationsXML</locations>" );
+
+        my $results = $dom->findnodes('//geo');
+
+        foreach my $geo ( $results->get_nodelist ) {
+            $r{ 'DEEP-' . $geo->findvalue('@source') } = [ $geo->findvalue('@lat'), $geo->findvalue('@long') ];
+        }
+
+    }
+
+# http://unlock.edina.ac.uk/ws/search?name=appleford&searchVariants=false&format=json
+
+    say Dumper {%r};
 }
-
-# http://www.openstreetmap.org/#map=14/51.0076/-2.8466
 
