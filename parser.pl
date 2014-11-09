@@ -28,7 +28,7 @@ my @lines = io $filename;
 
 while ( my $row = $csv->getline(@lines) ) {
     next if ( $. == 1 );
-    last if ( $. == 20 );
+    last if ( $. == 100 );
     my $title = $row->[1];
 
     my $catalogue_reference  = $row->[0];
