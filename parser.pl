@@ -10,8 +10,7 @@ use XML::LibXML '1.70';
 
 my $g = {
     type     => "FeatureCollection",
-    features => [
-    ]
+    features => []
 };
 
 my $parser = XML::LibXML->new();
@@ -29,24 +28,50 @@ my @lines = io $filename;
 
 while ( my $row = $csv->getline(@lines) ) {
     next if ( $. == 1 );
-    last if ( $. == 200 );
-    my %r;
+    last if ( $. == 20 );
     my $title = $row->[1];
-    $r{'catalogue_reference'} = $row->[0];
-    $r{'title'}               = $row->[1];
+
     my $catalogue_reference  = $row->[0];
     my @title_parts          = split( " - ", $title );
     my @title_parts_reversed = reverse @title_parts;
 
-    my $GLatLong;
-
-    $r{'shire'} = $title_parts[1];
+    my $shire = $title_parts[1];
 
     my $nice_first = $title_parts_reversed[0];
     $nice_first =~ s/\.$//;       # trailing period
     $nice_first =~ s/^\s//;       # leading space
     $nice_first =~ s/\[\?\]//;    # leading space
-    $r{'target'} = $nice_first;
+    
+	my $YJSON = get('http://query.yahooapis.com/v1/public/yql?q=SELECT%20*%20FROM%20geo.placefinder%20WHERE%20name%3D%22' . $nice_first . '%22%20and%20locale%3D%22GB%22%20%7C%20truncate(count%3D1)&format=json');
+    my $YResponse    = decode_json $YJSON;
+    
+        if ( $YResponse->{query}->{results}->{Result}->{countrycode}  eq
+            "GB" )
+        {
+			my $YLong = $YResponse->{query}->{results}->{Result}->{longitude};
+			my $YLat = $YResponse->{query}->{results}->{Result}->{latitude};
+            push(
+                $g->{features},
+                {
+                    'type'   => "Feature",
+                    geometry => {
+                        type        => "Point",
+                        coordinates => [
+                            $YLong + 0,
+                            $YLat + 0
+                        ]
+                    },
+                    properties => {
+                        name      => $nice_first,
+                        source    => "YQL",
+                        reference => $catalogue_reference
+                      }
+
+                }
+            );
+
+        }
+
 
     my $OSJSON = get(
 'http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search?query='
@@ -57,27 +82,27 @@ while ( my $row = $csv->getline(@lines) ) {
         if ( $OSFirstResult->{type} eq
             "http://data.ordnancesurvey.co.uk/ontology/admingeo/CivilParish" )
         {
-            $r{'OS'} =
-              [ $OSFirstResult->{latitude}, $OSFirstResult->{longitude} ];
-              
-              
-              push(
-				$g->{features},
-				{
-					'type'   => "Feature",
-					geometry => {
-						type        => "Point",
-						coordinates => [ $OSFirstResult->{longitude} + 0, $OSFirstResult->{latitude} + 0 ]
-					},
-					properties => {
-						name => $nice_first,
-						source => "OS",
-						reference => $catalogue_reference
-					  }
 
-				}
-			);
-			
+            push(
+                $g->{features},
+                {
+                    'type'   => "Feature",
+                    geometry => {
+                        type        => "Point",
+                        coordinates => [
+                            $OSFirstResult->{longitude} + 0,
+                            $OSFirstResult->{latitude} + 0
+                        ]
+                    },
+                    properties => {
+                        name      => $nice_first,
+                        source    => "OS",
+                        reference => $catalogue_reference
+                      }
+
+                }
+            );
+
         }
     }
 
@@ -87,38 +112,60 @@ while ( my $row = $csv->getline(@lines) ) {
     my $NOSMResponse    = decode_json $NOSMJSON;
     my $NOSMFirstResult = shift $NOSMResponse;
     if ($NOSMFirstResult) {
-        $r{'NOSM'} = [ $NOSMFirstResult->{lat}, $NOSMFirstResult->{lon} ];
-        
-        push(
-				$g->{features},
-				{
-					'type'   => "Feature",
-					id => $catalogue_reference,
-					geometry => {
-						type        => "Point",
-						coordinates => [ $NOSMFirstResult->{lon} + 0, $NOSMFirstResult->{lat} + 0 ]
-					},
-					properties => {
-						name => $nice_first,
-						source => "NOSM",
-						reference => $catalogue_reference
-					  }
 
-				}
-			);
-			
+        push(
+            $g->{features},
+            {
+                'type'   => "Feature",
+                id       => $catalogue_reference,
+                geometry => {
+                    type        => "Point",
+                    coordinates => [
+                        $NOSMFirstResult->{lon} + 0,
+                        $NOSMFirstResult->{lat} + 0
+                    ]
+                },
+                properties => {
+                    name      => $nice_first,
+                    source    => "OSM",
+                    reference => $catalogue_reference
+                  }
+
+            }
+        );
+
     }
 
-    #     my $GJSON =
-    #       get(  'http://maps.googleapis.com/maps/api/geocode/json?address='
-    #           . $nice_first
-    #           . '&region=gb' );
-    #     my $GResponse      = decode_json $GJSON;
-    #     my $GFirstResult   = shift $GResponse->{results};
-    #     my $GLatLongResult = $GFirstResult->{geometry}->{location};
-    #     if ($GFirstResult) {
-    #         $GLatLong = [ $GLatLongResult->{lat}, $GLatLongResult->{lng} ];
-    #     }
+#     my $GJSON =
+#       get(  'http://maps.googleapis.com/maps/api/geocode/json?address='
+#           . $nice_first
+#           . '&region=gb' );
+#     my $GResponse      = decode_json $GJSON;
+#     my $GFirstResult   = shift $GResponse->{results};
+#     my $GLatLongResult = $GFirstResult->{geometry}->{location};
+#     if ($GFirstResult) {
+# 
+#         push(
+#             $g->{features},
+#             {
+#                 'type'   => "Feature",
+#                 id       => $catalogue_reference,
+#                 geometry => {
+#                     type        => "Point",
+#                     coordinates => [
+#                         $GLatLongResult->{lng} + 0, $GLatLongResult->{lat} + 0
+#                     ]
+#                 },
+#                 properties => {
+#                     name      => $nice_first,
+#                     source    => "Google",
+#                     reference => $catalogue_reference
+#                   }
+# 
+#             }
+#         );
+# 
+#     }
 
     my $DEEPJSON =
       get(  'http://unlock.edina.ac.uk/ws/search?name='
@@ -128,7 +175,7 @@ while ( my $row = $csv->getline(@lines) ) {
     my $DEEPFirstResult = shift $DEEPResponse->{features};
     my $DEEPProperties  = $DEEPFirstResult->{properties};
     if ( $DEEPFirstResult->{properties} ) {
-        $r{'DEEP-centroid'} =
+        my ($DEEPCentroidLat, $DEEPCentroidLong)  =
           [ reverse split( /,/, $DEEPProperties->{centroid} ) ];
         my $LocationsXML = $DEEPProperties->{locations};
         my $dom =
@@ -138,36 +185,33 @@ while ( my $row = $csv->getline(@lines) ) {
         my $results = $dom->findnodes('//geo');
 
         foreach my $geo ( $results->get_nodelist ) {
-        	my $long = sprintf("%g", $geo->findvalue('@long'));
-        	my $lat = sprintf("%g", $geo->findvalue('@lat'));
-            $r{ 'DEEP-' . $geo->findvalue('@source') } =
-              [ $geo->findvalue('@lat'), $geo->findvalue('@long') ];
-				
-			push(
-				$g->{features},
-				{
-					'type'   => "Feature",
-					id => $catalogue_reference,
-					geometry => {
-						type        => "Point",
-						coordinates => [ $long + 0, $lat + 0 ]
-					},
-					properties => {
-						name => $nice_first,
-						source => "DEEP-" . $geo->findvalue('@source'),
-						reference => $catalogue_reference
-					  }
+            my $long = sprintf( "%g", $geo->findvalue('@long') );
+            my $lat  = sprintf( "%g", $geo->findvalue('@lat') );
 
-				}
-			);
+            push(
+                $g->{features},
+                {
+                    'type'   => "Feature",
+                    id       => $catalogue_reference,
+                    geometry => {
+                        type        => "Point",
+                        coordinates => [ $long + 0, $lat + 0 ]
+                    },
+                    properties => {
+                        name      => $nice_first,
+                        source    => "DEEP-" . $geo->findvalue('@source'),
+                        reference => $catalogue_reference
+                      }
+
+                }
+            );
         }
 
     }
 
 # http://unlock.edina.ac.uk/ws/search?name=appleford&searchVariants=false&format=json
 
-#     say Dumper {%r};
-say "Processing $nice_first";
+    say "Processing $nice_first";
 
 }
 
@@ -175,6 +219,5 @@ my $gjson = to_json $g;
 
 $gjson > io('file.json');
 
-
-
+# https://github.com/blog/1541-geojson-rendering-improvements
 
