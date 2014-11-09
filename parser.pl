@@ -8,6 +8,8 @@ use LWP::Simple;
 use JSON;
 use XML::LibXML '1.70';
 
+
+
 my $g = {
     type     => "FeatureCollection",
     features => []
@@ -32,6 +34,9 @@ while ( my $row = $csv->getline(@lines) ) {
     my $title = $row->[1];
 
     my $catalogue_reference  = $row->[0];
+    my @hh = split("/", $catalogue_reference);
+		pop @hh;
+		my $portref = "<a href='http://www.portcullis.parliament.uk/CalmView/Record.aspx?src=CalmView.Catalog&id=" . join("%2f", @hh) . "'>Portcullis</a>";
     my @title_parts          = split( " - ", $title );
     my @title_parts_reversed = reverse @title_parts;
 
@@ -64,7 +69,8 @@ while ( my $row = $csv->getline(@lines) ) {
                     properties => {
                         name      => $nice_first,
                         source    => "YQL",
-                        reference => $catalogue_reference
+                        reference => $catalogue_reference,
+                        href => $portref
                       }
 
                 }
@@ -97,7 +103,8 @@ while ( my $row = $csv->getline(@lines) ) {
                     properties => {
                         name      => $nice_first,
                         source    => "OS",
-                        reference => $catalogue_reference
+                        reference => $catalogue_reference,
+                        href => $portref
                       }
 
                 }
@@ -112,7 +119,9 @@ while ( my $row = $csv->getline(@lines) ) {
     my $NOSMResponse    = decode_json $NOSMJSON;
     my $NOSMFirstResult = shift $NOSMResponse;
     if ($NOSMFirstResult) {
-
+    
+		
+		
         push(
             $g->{features},
             {
@@ -128,7 +137,10 @@ while ( my $row = $csv->getline(@lines) ) {
                 properties => {
                     name      => $nice_first,
                     source    => "OSM",
-                    reference => $catalogue_reference
+                    reference => $catalogue_reference,
+                    
+                    
+                    href => $portref
                   }
 
             }
