@@ -30,7 +30,7 @@ my @lines = io $filename;
 
 while ( my $row = $csv->getline(@lines) ) {
     next if ( $. == 1 );
-    last if ( $. == 100 );
+    last if ( $. == 2000 );
     my $title = $row->[1];
 
     my $catalogue_reference  = $row->[0];
@@ -148,36 +148,36 @@ while ( my $row = $csv->getline(@lines) ) {
 
     }
 
-#     my $GJSON =
-#       get(  'http://maps.googleapis.com/maps/api/geocode/json?address='
-#           . $nice_first
-#           . '&region=gb' );
-#     my $GResponse      = decode_json $GJSON;
-#     my $GFirstResult   = shift $GResponse->{results};
-#     my $GLatLongResult = $GFirstResult->{geometry}->{location};
-#     if ($GFirstResult) {
-# 
-#         push(
-#             $g->{features},
-#             {
-#                 'type'   => "Feature",
-#                 id       => $catalogue_reference,
-#                 geometry => {
-#                     type        => "Point",
-#                     coordinates => [
-#                         $GLatLongResult->{lng} + 0, $GLatLongResult->{lat} + 0
-#                     ]
-#                 },
-#                 properties => {
-#                     name      => $nice_first,
-#                     source    => "Google",
-#                     reference => $catalogue_reference
-#                   }
-# 
-#             }
-#         );
-# 
-#     }
+    my $GJSON =
+      get(  'http://maps.googleapis.com/maps/api/geocode/json?address='
+          . $nice_first
+          . '&region=gb' );
+    my $GResponse      = decode_json $GJSON;
+    my $GFirstResult   = shift $GResponse->{results};
+    my $GLatLongResult = $GFirstResult->{geometry}->{location};
+    if ($GFirstResult) {
+
+        push(
+            $g->{features},
+            {
+                'type'   => "Feature",
+                id       => $catalogue_reference,
+                geometry => {
+                    type        => "Point",
+                    coordinates => [
+                        $GLatLongResult->{lng} + 0, $GLatLongResult->{lat} + 0
+                    ]
+                },
+                properties => {
+                    name      => $nice_first,
+                    source    => "Google",
+                    reference => $catalogue_reference
+                  }
+
+            }
+        );
+
+    }
 
     my $DEEPJSON =
       get(  'http://unlock.edina.ac.uk/ws/search?name='
