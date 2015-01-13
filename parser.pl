@@ -8,8 +8,6 @@ use LWP::Simple;
 use JSON;
 use XML::LibXML '1.70';
 
-
-
 my $g = {
     type     => "FeatureCollection",
     features => []
