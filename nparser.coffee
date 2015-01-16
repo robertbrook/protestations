@@ -1,16 +1,36 @@
 csv = require "fast-csv"
 request = require "request"
 qs = require "querystring"
+fs = require 'fs'
 
-csv.fromPath "records.csv"
+stream = fs.createReadStream("records.csv")
+
+#http://c2fo.github.io/fast-csv/
+
+csvStream = csv.createWriteStream(headers: true)
+writableStream = fs.createWriteStream("out.csv")
+writableStream.on "finish", ->
+  console.log "DONE!"
+  csvStream.end()
+  
+
+csvStream.pipe writableStream
+
+csv.fromStream stream
+#.validate (data) ->
+#  data[1].length > 500
+#.on "data-invalid", (data) ->
+#  console.log "invalid data"
 .on "data", (data) ->
   yql data
-  os data
+  #os data
   osm data
   #google data
-  edina data
-#.on "end", ->
-#  console.log "ENDS"
+  #edina data
+.on "end", ->
+ console.log "ENDS"
+ 
+#csvStream.end()
  
 massage = (dashedstring) ->
   [..., last] = dashedstring[1].split ' - '
@@ -26,10 +46,11 @@ yql = (data) ->
    if jsonbody.query
      if jsonbody.query.count
        result = jsonbody.query.results.Result
-       console.log ["YQL", target, result.latitude, result.longitude]
-
-     else
-       "NO RESULT FOR " + target
+       csvStream.write
+         target: target
+         src: "YQL"
+         lat: result.latitude
+         lng: result.longitude
    
 osm = (data) ->
   target = massage data
@@ -42,24 +63,30 @@ osm = (data) ->
    jsonbody = JSON.parse body
    firstresult = jsonbody[0]
    if firstresult
-     console.log ["OSM", target, firstresult.lat, firstresult.lon]
-   else
-     "NO RESULT FOR " + target
+     csvStream.write
+       target: target
+       src: "OSM"
+       lat: firstresult.lat
+       lng: firstresult.lon
   
 os = (data) ->
   target = massage data
-  qstring = qs.stringify
-    query: target
-  request 'http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search?' + qstring, (error, response, body) ->
-   jsonbody = JSON.parse body
+  if target isnt ""
+    qstring = qs.stringify
+      query: target
+    request 'http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search?' + qstring, (error, response, body) ->
+     jsonbody = JSON.parse body
    
-   results = (item for item in jsonbody.results when item.type is "http://data.ordnancesurvey.co.uk/ontology/admingeo/CivilParish")
-   if results > 0
-     firstresult = results[0]
-     console.log ["OSV", target, firstresult.latitude, firstresult.longitude]
-   else
-     "NO RESULT FOR " + target
-  
+     results = (item for item in jsonbody.results when item.type is "http://data.ordnancesurvey.co.uk/ontology/admingeo/CivilParish")
+     
+     if results.length > 0
+       firstresult = results[0]
+       csvStream.write
+         target: target
+         src: "OSM"
+         lat: firstresult.latitude
+         lng: firstresult.longitude
+         
 google = (data) ->
   target = massage data
   qstring = qs.stringify
@@ -71,8 +98,6 @@ google = (data) ->
    if results > 0
      firstresult = results[0]
      console.log ["GOO", target, firstresult.geometry.location.lat, firstresult.geometry.location.lng]
-   else
-     "NO RESULT FOR " + target
 
 edina = (data) ->
   target = massage data
