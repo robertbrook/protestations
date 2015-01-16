@@ -59,7 +59,6 @@ os = (data) ->
      console.log ["OSV", target, firstresult.latitude, firstresult.longitude]
    else
      "NO RESULT FOR " + target
-
   
 google = (data) ->
   target = massage data
@@ -77,4 +76,4 @@ google = (data) ->
 
 edina = (data) ->
   target = massage data
-  console.log ["EDI", target, "edina_latitude", "edina_longitude"]
+  console.log ["EDI", target, "0.0", "0.0"]
