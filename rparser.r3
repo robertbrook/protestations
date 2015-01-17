@@ -4,7 +4,6 @@ lines: read/lines %records.csv
 
 foreach line lines [
         lineblock: parse/all line ","
-        ; print parse first lineblock "/"
         titleparts: parse pick lineblock 2 " - "
         target: last titleparts
         replace target "." ""
@@ -12,6 +11,7 @@ foreach line lines [
         
     
         pagestring: to-string read to-url targeturl
-        jtags: load-json/flat pagestring
-        probe first first jtags
+        jtags: first load-json/flat pagestring
+        ;foreach jtag jtags [probe jtag]
+        probe to-decimal select jtags <lat>
     ]

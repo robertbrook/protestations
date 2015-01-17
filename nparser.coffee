@@ -2,6 +2,8 @@ csv = require "fast-csv"
 request = require "request"
 qs = require "querystring"
 fs = require 'fs'
+cconv = require 'cconv' # ENs to LLs in parish csv
+sleep = require 'sleep'
 
 stream = fs.createReadStream("records.csv")
 
@@ -10,27 +12,28 @@ stream = fs.createReadStream("records.csv")
 csvStream = csv.createWriteStream(headers: true)
 writableStream = fs.createWriteStream("out.csv")
 writableStream.on "finish", ->
-  console.log "DONE!"
   csvStream.end()
+  console.log "finished"
   
-
 csvStream.pipe writableStream
 
-csv.fromStream stream
-#.validate (data) ->
-#  data[1].length > 500
-#.on "data-invalid", (data) ->
-#  console.log "invalid data"
-.on "data", (data) ->
-  yql data
-  #os data
-  osm data
-  #google data
-  #edina data
-.on "end", ->
- console.log "ENDS"
- 
-#csvStream.end()
+parse = () ->
+  csv.fromStream stream
+  .validate (data) ->
+   data[0].length > 0
+  .on "data-invalid", (data) ->
+   console.log "invalid data: " + data[1]
+
+  .on "data", (data) ->
+#   console.log data
+    yql data
+    #os data
+    osm data
+    #google data
+    #edina data
+    console.log data[0]
+  .on "end", ->
+    console.log "parsers running"
  
 massage = (dashedstring) ->
   [..., last] = dashedstring[1].split ' - '
@@ -38,6 +41,7 @@ massage = (dashedstring) ->
 
 yql = (data) ->
   target = massage data
+  console.log "yql"
   qstring = qs.stringify
     q: "SELECT * FROM geo.placefinder WHERE text='" + target + "' and countrycode='GB' | truncate(count=1)"
     format: "json"
@@ -53,6 +57,7 @@ yql = (data) ->
          lng: result.longitude
    
 osm = (data) ->
+  sleep.sleep 2
   target = massage data
   qstring = qs.stringify
     format: "json"
@@ -60,12 +65,14 @@ osm = (data) ->
     countrycodes: "gb"
     q: target
   request 'http://nominatim.openstreetmap.org/search/?' + qstring, (error, response, body) ->
-   jsonbody = JSON.parse body
-   firstresult = jsonbody[0]
-   if firstresult
-     csvStream.write
-       target: target
-       src: "OSM"
+    console.log body
+    jsonbody = JSON.parse body
+    
+    firstresult = jsonbody[0]
+    if firstresult
+      csvStream.write
+        target: target
+        src: "OSM"
        lat: firstresult.lat
        lng: firstresult.lon
   
@@ -102,3 +109,5 @@ google = (data) ->
 edina = (data) ->
   target = massage data
   console.log ["EDI", target, "0.0", "0.0"]
+
+parse()
