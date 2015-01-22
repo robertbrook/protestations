@@ -2,7 +2,8 @@ request = require('request')
 sleep = require('sleep')
 sqlite3 = require("sqlite3").verbose()
 db = new sqlite3.Database("protestations.db")
-
+qs = require "querystring"
+http = require "http"
 #console.log process.argv.slice(2)
 
 massage = (dashedstring) ->
@@ -22,29 +23,71 @@ populatetargets = () ->
       """
 
 populateNominatimLL = () ->
-#  db.serialize ->
 
-	db.each "SELECT * FROM records", (err, row) ->
-		target = row['target']
-		
-		request "http://nominatim.openstreetmap.org/search?format=json&q=#{target}&countrycodes=gb&limit=1", (error, response, body) ->
-		  
-			if not error and response.statusCode is 200
-				console.log target
-				myjson = JSON.parse body
-				if myjson.length > 0
-					mylat = myjson[0].lat
-					mylon = myjson[0].lon
-					myresult = [mylat, mylon]
-					console.log myresult
-					db.run """
-					UPDATE records
-					SET "NominatimLL" = "#{mylat}, #{mylon}"
-					WHERE "Catalogue Reference" is '#{row['Catalogue Reference']}';
-					"""
-			sleep.sleep 2
+  db.each "SELECT * FROM records", (err, row) ->
+    target = row['target']
+   
+    request "http://nominatim.openstreetmap.org/search?format=json&q=#{target}&countrycodes=gb&limit=1", (error, response, body) ->
+     
+      if not error and response.statusCode is 200
+        console.log target
+        console.log row['_rowid_']
+        myjson = JSON.parse body
+        if myjson.length > 0
+          mylat = myjson[0].lat
+          mylon = myjson[0].lon
+          myresult = [mylat, mylon]
+          console.log myresult
+          db.run """
+          UPDATE records
+          SET "NominatimLL" = "#{mylat}, #{mylon}"
+          WHERE "Catalogue Reference" is '#{row['Catalogue Reference']}';
+          """
+      sleep.sleep 2
+
       
+populateYahooLL = () ->
 
-populateNominatimLL()   
+  db.each "SELECT * FROM records", (err, row) ->
+    target = row['target']
+    console.log [target, row['Catalogue Reference']]
+
+    qstring = qs.stringify
+      q: "SELECT * FROM geo.placefinder WHERE text='" + target + "' and countrycode='GB' | truncate(count=1)"
+      format: "json"
+
+    
+    request
+      method: "GET"
+      uri: 'http://query.yahooapis.com/v1/public/yql?' + qstring
+    , (error, response, body) ->
+      console.log response
+      if response.statusCode is 200
+        console.log JSON.parse(body)
+        
+    request 'http://query.yahooapis.com/v1/public/yql?' + qstring, (error, response, body) ->
+      if not error and response.statusCode is 200
+        
+        jsonbody = JSON.parse body
+        if jsonbody.query
+          if jsonbody.query.count > 0
+            result = jsonbody.query.results.Result
+            mylat: result.latitude
+            mylon: result.longitude
+            console.log [mylat, mylon]
+            db.run """
+            UPDATE records
+            SET "YahooLL" = "#{mylat}, #{mylon}"
+            WHERE "Catalogue Reference" is '#{row['Catalogue Reference']}';
+            """
+    sleep.sleep 2
+      
+populateYahooLL()   
+
+
+
 #db.close()
+
+
+
 
