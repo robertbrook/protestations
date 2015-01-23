@@ -4,6 +4,8 @@ sqlite3 = require("sqlite3").verbose()
 db = new sqlite3.Database("protestations.db")
 qs = require "querystring"
 http = require "http"
+csv = require "fast-csv"
+
 #console.log process.argv.slice(2)
 
 massage = (dashedstring) ->
@@ -55,15 +57,6 @@ populateYahooLL = () ->
     qstring = qs.stringify
       q: "SELECT * FROM geo.placefinder WHERE text='" + target + "' and countrycode='GB' | truncate(count=1)"
       format: "json"
-
-    
-    request
-      method: "GET"
-      uri: 'http://query.yahooapis.com/v1/public/yql?' + qstring
-    , (error, response, body) ->
-      console.log response
-      if response.statusCode is 200
-        console.log JSON.parse(body)
         
     request 'http://query.yahooapis.com/v1/public/yql?' + qstring, (error, response, body) ->
       if not error and response.statusCode is 200
@@ -75,11 +68,7 @@ populateYahooLL = () ->
             mylat: result.latitude
             mylon: result.longitude
             console.log [mylat, mylon]
-            db.run """
-            UPDATE records
-            SET "YahooLL" = "#{mylat}, #{mylon}"
-            WHERE "Catalogue Reference" is '#{row['Catalogue Reference']}';
-            """
+            
     sleep.sleep 2
       
 populateYahooLL()   
