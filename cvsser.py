@@ -8,9 +8,7 @@ with open('protestations.csv', 'r') as f:
     reader = csv.reader(f)
     
     for row in reader:
-      if reader.line_num > 1426:
-      
-#       THIS IS HOW FAR THE THING HAS RUN!!
+      if reader.line_num > 161:
 
         print reader.line_num
 
@@ -19,16 +17,24 @@ with open('protestations.csv', 'r') as f:
           catref = row[0]
   
           time.sleep(randint(1,4))
-          payload = {'address': target, 'region': 'GB'}
-          r = requests.get("http://maps.googleapis.com/maps/api/geocode/json", params=payload)
-          j = r.json()
-          if len(j['results']) > 0:
-          
-            with open('google-results.csv', 'a') as csvfile:
-              writer = csv.writer(csvfile)
-              mylat = j['results'][0]['geometry']['location']['lat']
-              mylon = j['results'][0]['geometry']['location']['lng']
-              latlon = str(mylat) + ", " + str(mylon)
-              print (catref, str(latlon))
-              writer.writerow([catref, str(latlon)])
+          payload = {'query': target}
+          r = requests.get("http://data.ordnancesurvey.co.uk/datasets/os-linked-data/apis/search", params=payload)
+          print r.status_code
+          if r.status_code == 200:
+						j = r.json()
+					
+					
+						if len(j['results']) > 0:
+							if j['results'][0]['type'] == "http://data.ordnancesurvey.co.uk/ontology/admingeo/CivilParish":
+
+					
+								with open('os-results.csv', 'a') as csvfile:
+									writer = csv.writer(csvfile)
+									mylat = j['results'][0]['latitude']
+									mylon = j['results'][0]['longitude']
+									latlon = str(mylat) + ", " + str(mylon)
+									print (catref, str(latlon))
+									writer.writerow([catref, str(latlon)])
+
+
 
